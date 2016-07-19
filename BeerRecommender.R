@@ -1,16 +1,21 @@
-set.seed(222)
-library(ggplot2); library(LaF); library(stringr); library(tm); library(plyr); library(reshape2); library(RCurl); library(XML); library(RColorBrewer)
-if (!exists("Data")){
-  Data<-data.frame(BeerName=character() , BeerCompany=character() , BARating=double() , Comment=character(),stringsAsFactors = FALSE)
-  Datarecomender<- data.frame(BeerName=character(), Username=character(), Rating=double(),stringsAsFactors = FALSE)
+# Library packages
+library(ggplot2); library(LaF); library(stringr); library(tm); library(plyr); 
+library(reshape2); library(RCurl); library(XML); library(RColorBrewer)
+
+if (!exists("db")){
+  db <- data.frame(BeerName = character(), BeerCompany = character(),
+                   BARating = double(), Comment = character(),
+                   stringsAsFactors = FALSE)
+  db_recommender <- data.frame(BeerName = character(), Username = character(),
+                               Rating = double(), stringsAsFactors = FALSE)
   download.file("https://raw.githubusercontent.com/Peyman-Heidari/DataIncubator/master/BeerLinks.txt", destfile = "./BeerLinks.txt")
-  links1<- read.table( "BeerLinks.txt", fill=TRUE)
-  link<- as.character(links1[,3])
-  link<- link[grepl("beer/profile", link)]
-  link<- link[!grepl("\\?", link)]
-  link<- link[grepl("[0-9]+/[0-9]+", link)]
-  link<- str_replace_all(link, ",", "")
-  link<- unique(link)
+  links1<- read.table("BeerLinks.txt", fill=TRUE)
+  link <- as.character(links1[, 3])
+  link <- link[grepl("beer/profile", link)]
+  link <- link[!grepl("\\?", link)]
+  link <- link[grepl("[0-9]+/[0-9]+", link)]
+  link <- str_replace_all(link, ",", "")
+  link <- unique(link)
   for (ii in 1:length(link)){
     for (zz in 0:5){
       theURL <-link[ii]
@@ -22,11 +27,11 @@ if (!exists("Data")){
       if (length(beername)>0 & zz==0){
         beername <- str_replace_all(beername, "\t|\n", "")
         splitednamecom<- str_split_fixed(beername, "\\|", 2)
-        Data[ii,1]<- str_trim(splitednamecom[1])
-        Data[ii,2]<- str_trim(splitednamecom[2])
+        db[ii,1]<- str_trim(splitednamecom[1])
+        db[ii,2]<- str_trim(splitednamecom[2])
      }
      bascore<- xpathSApply(beerdoc, "//*/span[@ class='BAscore_big ba-score']", xmlValue)
-     if (length(bascore)>0 & zz==0){Data[ii,3]<-bascore }
+     if (length(bascore)>0 & zz==0){db[ii,3]<-bascore }
      comments<-xpathSApply(beerdoc, "//*/div[@class='user-comment']", xmlValue)
      if (length(comments)>0){
        splitedcomments<- str_split_fixed(comments, "overall:", 2)
@@ -34,7 +39,7 @@ if (!exists("Data")){
        splitedcommentsR<- gsub("[^[:alnum:][:blank:]+?&/\\-]", "", splitedcommentsR)
        splitedcommentsR<- gsub("[[:digit:]]+", "", splitedcommentsR)
        collapsedcomments<- paste (splitedcommentsR, collapse = " ")
-       Data[ii,4]<-paste (Data[ii,4], collapsedcomments , collapse = " ")
+       db[ii,4]<-paste (db[ii,4], collapsedcomments , collapse = " ")
      }
      Userrating<- as.numeric(xpathSApply(beerdoc, "//*/span[@ class='BAscore_norm']", xmlValue))
      usernames<- xpathSApply(beerdoc, "//*/a[@ class='username']", xmlValue)
@@ -43,24 +48,24 @@ if (!exists("Data")){
      Datarecomender2<- data.frame(BeerName=character(), Username=character(), Rating=double(),stringsAsFactors = FALSE)
      if (length(Userrating)>0 &length(beername)>0 & length(usernames)>0){
        for (jj in 1: length(Userrating)){Datarecomender2[jj,1]=str_trim(splitednamecom[1]); Datarecomender2[jj,2]= usernames[jj]; Datarecomender2[jj,3]= Userrating[jj]}
-       Datarecomender<- rbind(Datarecomender,Datarecomender2)
+       db_recommender<- rbind(db_recommender,Datarecomender2)
      }
      print(ii)
    }
   }
-  Data[,4]<- gsub("^NA", "",  Data[,4])
-  Data<- Data[!duplicated(Data),]
-  Datarecomender<- Datarecomender[!duplicated(Datarecomender),]
-  Beers<- unique(Datarecomender["BeerName"])
-  Users<- unique(Datarecomender["Username"])
-  RatingUsers<- acast(Datarecomender, BeerName~Username, value.var="Rating")
+  db[,4]<- gsub("^NA", "",  db[,4])
+  db<- db[!duplicated(db),]
+  db_recommender<- db_recommender[!duplicated(db_recommender),]
+  Beers<- unique(db_recommender["BeerName"])
+  Users<- unique(db_recommender["Username"])
+  RatingUsers<- acast(db_recommender, BeerName~Username, value.var="Rating")
   R<- matrix(data=0,nrow=dim(Beers)[1],ncol=dim(Users)[1])
   R[!is.na(RatingUsers)]<-1
 }
-Dataref<- Data
+Dataref<- db
 RatingUsersref<-RatingUsers
 
-DataRecomPlot<- Datarecomender
+DataRecomPlot<- db_recommender
 
 myPalette <- colorRampPalette(brewer.pal(11, "Spectral"))
 q <- ggplot(DataRecomPlot, aes(x=Username, y=BeerName))
@@ -73,7 +78,7 @@ dev.off()
 
 
 
-mycorpus <- Corpus(DataframeSource(Data["Comment"]))
+mycorpus <- Corpus(DataframeSource(db["Comment"]))
 mycorpus <- tm_map(mycorpus, removeWords, stopwords("english"))
 mycorpus <- tm_map(mycorpus, removePunctuation)
 mycorpus <- tm_map(mycorpus, stripWhitespace)
@@ -82,9 +87,9 @@ dtmr <- DocumentTermMatrix(mycorpus, control=list(wordLengths=c(4, 20)))
 freq <- colSums(as.matrix(dtmr))
 ord <- order(freq,decreasing=TRUE)
 
-Data$RatingLevel <- as.factor(ifelse(Data$BARating > 95,"HighQuality", "LowQuality"))
-DataHigh<- Data[Data$RatingLevel=="HighQuality", ]
-DataLow<- Data[Data$RatingLevel=="LowQuality", ]
+db$RatingLevel <- as.factor(ifelse(db$BARating > 95,"HighQuality", "LowQuality"))
+DataHigh<- db[db$RatingLevel=="HighQuality", ]
+DataLow<- db[db$RatingLevel=="LowQuality", ]
 
 mycorpusHigh <- Corpus(DataframeSource(DataHigh["Comment"]))
 mycorpusHigh <- tm_map(mycorpusHigh, removeWords, stopwords("english"))
