@@ -3,7 +3,7 @@ library(ggplot2); library(LaF); library(stringr); library(tm); library(plyr); li
 if (!exists("Data")){
   Data<-data.frame(BeerName=character() , BeerCompany=character() , BARating=double() , Comment=character(),stringsAsFactors = FALSE)
   Datarecomender<- data.frame(BeerName=character(), Username=character(), Rating=double(),stringsAsFactors = FALSE)
-  download.file("https://www.dropbox.com/s/uv3m5yx01tuq527/BeerLinks.txt?dl=1", destfile = "./BeerLinks.txt")
+  download.file("https://raw.githubusercontent.com/Peyman-Heidari/DataIncubator/master/BeerLinks.txt", destfile = "./BeerLinks.txt")
   links1<- read.table( "BeerLinks.txt", fill=TRUE)
   link<- as.character(links1[,3])
   link<- link[grepl("beer/profile", link)]
